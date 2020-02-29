@@ -1,12 +1,22 @@
-CFLAGS := -std=c99 -D_GNU_SOURCE
-OBJ    := termsploit.o example.o
+# Compiler flags
+CFLAGS  := -std=c99 -D_GNU_SOURCE -pedantic -Wall \
+	-Wdeclaration-after-statement -Wno-parentheses
 
-termsploit: $(OBJ)
-	$(CC) $(LDFLAGS) -o $@ $^
+# Library object files
+LIBOBJ  := util.o termsploit.o
+
+.PHONY: all
+all: libtermsploit.so libtermsploit.a
+
+libtermsploit.so: $(LIBOBJ)
+	$(CC) $(LDFLAGS) -shared -o $@ $(LIBOBJ)
+
+libtermsploit.a: $(LIBOBJ)
+	$(AR) -cr $@ $(LIBOBJ)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $^
 
 .PHONY: clean
 clean:
-	rm -f *.o termsploit
+	rm -f *.o *.a *.so

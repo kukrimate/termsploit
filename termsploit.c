@@ -1,15 +1,19 @@
+/*
+ * Termsploit API
+ * Author: Mate Kukri
+ * License: ISC
+ */
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
+#include <stdint.h>
 #include <errno.h>
 #include <time.h>
-#include <termios.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include "termsploit.h"
+#include "util.h"
 
 struct termsploit_ctx {
 	/*
@@ -26,48 +30,25 @@ struct termsploit_ctx {
 	int fd;
 };
 
-/*
- * Disable all special input handling on a pty and make it behave like a
- * bi-directional pipe
- */
-static void makefullyraw(struct termios *conf)
-{
-	size_t i;
-	for (i = 0; i < NCCS; ++i) {
-		conf->c_cc[i] = 0;
-	}
-	cfmakeraw(conf);
-}
-
 termsploit_ctx *termsploit_spawn(char *args[])
 {
 	termsploit_ctx *ctx;
 
 	int master, slave;
-	struct termios conf;
 	pid_t pid;
 
 	ctx = malloc(sizeof(termsploit_ctx));
 	if (!ctx)
-		return NULL;
-
-	if (-1 == (master = posix_openpt(O_RDWR | O_NOCTTY)))
 		goto err;
-	if (-1 == grantpt(master) ||
-			-1 == unlockpt(master) ||
-			-1 == (slave = open(ptsname(master), O_RDWR)))
-		goto err_master;
 
-	if (-1 == tcgetattr(master, &conf))
-		goto err_slave;
-	makefullyraw(&conf);
-	if (-1 == tcsetattr(master, 0, &conf))
-		goto err_slave;
+	if (-1 == createfullyrawpty(&master, &slave))
+		goto err_free;
 
 	pid = fork();
 	switch (pid) {
 	case -1:
-		goto err_slave;
+		goto err_close;
+
 	case 0:
 		/* Child process */
 		close(master);
@@ -96,16 +77,17 @@ err_child:
 	ctx->fd  = master;
 	close(slave);
 	return ctx;
-err_slave:
-	close(slave);
-err_master:
+
+err_close:
 	close(master);
-err:
+	close(slave);
+err_free:
 	free(ctx);
+err:
 	return NULL;
 }
 
-termsploit_ctx *termsploit_sock(int sockfd)
+termsploit_ctx *termsploit_connect(char *host, uint16_t port)
 {
 	termsploit_ctx *ctx;
 
@@ -114,7 +96,11 @@ termsploit_ctx *termsploit_sock(int sockfd)
 		return NULL;
 
 	ctx->pid = -1;
-	ctx->fd  = sockfd;
+	ctx->fd  = tcpopen(host, port);
+	if (-1 == ctx->fd) {
+		free(ctx);
+		return NULL;
+	}
 	return ctx;
 }
 
@@ -137,49 +123,6 @@ ssize_t termsploit_write(termsploit_ctx *ctx, char *buf, size_t len)
 }
 
 
-static int makenonblock(int fd)
-{
-	int fl;
-	fl = fcntl(fd, F_GETFL);
-	if (-1 == fl)
-		return -1;
-	fl |= O_NONBLOCK;
-	if (-1 == fcntl(fd, F_SETFL, fl))
-		return -1;
-	return 0;
-}
-
-static int makeblock(int fd)
-{
-	int fl;
-	fl = fcntl(fd, F_GETFL);
-	if (-1 == fl)
-		return -1;
-	fl &= ~O_NONBLOCK;
-	if (-1 == fcntl(fd, F_SETFL, fl))
-		return -1;
-	return 0;
-}
-
-static int relay(int out, int in)
-{
-	ssize_t l;
-	char buf[4096];
-
-	l = read(in, buf, sizeof(buf));
-	if (-1 == l) {
-		if (errno == EAGAIN || errno == EWOULDBLOCK)
-			return 0;
-		return -1;
-	}
-	if (-1 == write(out, buf, l)) {
-		if (errno == EAGAIN || errno == EWOULDBLOCK)
-			return 0;
-		return -1;
-	}
-	return 0;
-}
-
 static int sigint_flag = 0;
 
 static void sigint_handler(int signum)
@@ -198,9 +141,9 @@ int termsploit_interactive(termsploit_ctx *ctx)
 		return -1;
 
 	while (!sigint_flag) {
-		if (-1 == relay(STDOUT_FILENO, ctx->fd))
+		if (-1 == fdcopy(STDOUT_FILENO, ctx->fd))
 			return -1;
-		if (-1 == relay(ctx->fd, STDIN_FILENO))
+		if (-1 == fdcopy(ctx->fd, STDIN_FILENO))
 			return -1;
 	}
 

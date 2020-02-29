@@ -14,7 +14,7 @@ termsploit_ctx *termsploit_spawn(char *args[]);
 /*
  * Create a new termsploit context and attach it to a socket
  */
-termsploit_ctx *termsploit_sock(int sockfd);
+termsploit_ctx *termsploit_connect(char *host, uint16_t port);
 
 /*** Core API ***/
 
