@@ -165,6 +165,7 @@ int termsploit_kill(termsploit_ctx *ctx, int sig)
 	return kill(ctx->pid, sig);
 }
 
+/* FIXME: refactor busy loop into a timer */
 int termsploit_exitcode(termsploit_ctx *ctx, time_t timeout)
 {
 	time_t start, cur;
