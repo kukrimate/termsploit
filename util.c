@@ -45,27 +45,10 @@ err:
 	return -1;
 }
 
-/*
- * Configure pty to behave like a bi-directional pipe
- */
-static int makefullyraw(int pty)
+int openrawpty(int *master, int *slave)
 {
-	struct termios conf;
-	size_t i;
+	struct termios termios;
 
-	if (-1 == tcgetattr(pty, &conf))
-		return -1;
-	for (i = 0; i < NCCS; ++i) {
-		conf.c_cc[i] = 0;
-	}
-	cfmakeraw(&conf);
-	if (-1 == tcsetattr(pty, 0, &conf))
-		return -1;
-	return 0;
-}
-
-int createfullyrawpty(int *master, int *slave)
-{
 	*master = posix_openpt(O_RDWR | O_NOCTTY);
 	if (-1 == *master)
 		goto err;
@@ -77,7 +60,10 @@ int createfullyrawpty(int *master, int *slave)
 	if (-1 == *slave)
 		goto err_master;
 
-	if (-1 == makefullyraw(*master))
+	if (-1 == tcgetattr(*slave, &termios))
+		goto err_slave;
+	cfmakeraw(&termios);
+	if (-1 == tcsetattr(*slave, 0, &termios))
 		goto err_slave;
 
 	return 0;
@@ -87,47 +73,4 @@ err_master:
 	close(*master);
 err:
 	return -1;
-}
-
-int makenonblock(int fd)
-{
-	int fl;
-	fl = fcntl(fd, F_GETFL);
-	if (-1 == fl)
-		return -1;
-	fl |= O_NONBLOCK;
-	if (-1 == fcntl(fd, F_SETFL, fl))
-		return -1;
-	return 0;
-}
-
-int makeblock(int fd)
-{
-	int fl;
-	fl = fcntl(fd, F_GETFL);
-	if (-1 == fl)
-		return -1;
-	fl &= ~O_NONBLOCK;
-	if (-1 == fcntl(fd, F_SETFL, fl))
-		return -1;
-	return 0;
-}
-
-int fdcopy(int out, int in)
-{
-	ssize_t l;
-	char buf[4096];
-
-	l = read(in, buf, sizeof(buf));
-	if (-1 == l) {
-		if (errno == EAGAIN || errno == EWOULDBLOCK)
-			return 0;
-		return -1;
-	}
-	if (-1 == write(out, buf, l)) {
-		if (errno == EAGAIN || errno == EWOULDBLOCK)
-			return 0;
-		return -1;
-	}
-	return 0;
 }

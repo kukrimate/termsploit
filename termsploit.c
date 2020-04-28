@@ -12,6 +12,7 @@
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <poll.h>
 #include "termsploit.h"
 #include "util.h"
 
@@ -41,7 +42,7 @@ termsploit_ctx *termsploit_spawn(char *args[])
 	if (!ctx)
 		goto err;
 
-	if (-1 == createfullyrawpty(&master, &slave))
+	if (-1 == openrawpty(&master, &slave))
 		goto err_free;
 
 	pid = fork();
@@ -123,32 +124,46 @@ ssize_t termsploit_write(termsploit_ctx *ctx, char *buf, size_t len)
 }
 
 
-static int sigint_flag = 0;
+static int sigint_flag;
 
 static void sigint_handler(int signum)
 {
 	sigint_flag = 1;
-	signal(SIGINT, SIG_DFL);
 }
 
 int termsploit_interactive(termsploit_ctx *ctx)
 {
-	if (-1 == makenonblock(ctx->fd) ||
-			-1 == makenonblock(STDIN_FILENO))
-		return -1;
+	struct pollfd fds[2];
+	char buf[4096];
+	size_t l;
 
+	sigint_flag = 0;
 	if (SIG_ERR == signal(SIGINT, sigint_handler))
 		return -1;
 
-	while (!sigint_flag) {
-		if (-1 == fdcopy(STDOUT_FILENO, ctx->fd))
-			return -1;
-		if (-1 == fdcopy(ctx->fd, STDIN_FILENO))
-			return -1;
+	fds[0].fd = STDIN_FILENO;
+	fds[0].events = POLLIN;
+	fds[1].fd = ctx->fd;
+	fds[1].events = POLLIN;
+
+	while (!sigint_flag && -1 != poll(fds, ARRAY_SIZE(fds), -1)) {
+		if (fds[0].revents & POLLHUP || fds[1].revents & POLLHUP)
+			break;
+
+		if (fds[0].revents & POLLIN) {
+			l = read(STDIN_FILENO, buf, sizeof(buf));
+			if (l > 0)
+				write(ctx->fd, buf, l);
+		}
+
+		if (fds[1].revents & POLLIN) {
+			l = read(ctx->fd, buf, sizeof(buf));
+			if (l > 0)
+				write(STDOUT_FILENO, buf, l);
+		}
 	}
 
-	if (-1 == makeblock(ctx->fd) ||
-			-1 == makeblock(STDIN_FILENO))
+	if (SIG_ERR == signal(SIGINT, SIG_DFL))
 		return -1;
 
 	return 0;

@@ -2,28 +2,18 @@
 #define UTIL_H
 
 /*
+ * Number of elements in an array
+ */
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*x))
+
+/*
  * Open a TCP connection to a host on a port
  */
 int tcpopen(char *host, uint16_t port);
 
 /*
- * Create a "fully raw" pty, e.g. one that behaves like a bi-directional pipe
+ * Create a master-slave pty pair and set it to raw mode
  */
-int createfullyrawpty(int *master, int *slave);
-
-/*
- * Set non-blocking mode on a file-descriptor
- */
-int makenonblock(int fd);
-
-/*
- * Un-set non-blocking mode on a file-descriptor
- */
-int makeblock(int fd);
-
-/*
- * Copy data between two file descriptors
- */
-int fdcopy(int out, int in);
+int openrawpty(int *master, int *slave);
 
 #endif
