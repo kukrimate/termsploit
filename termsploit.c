@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <errno.h>
-#include <time.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
@@ -123,30 +122,19 @@ ssize_t termsploit_write(termsploit_ctx *ctx, char *buf, size_t len)
 	return write(ctx->fd, buf, len);
 }
 
-
-static int sigint_flag;
-
-static void sigint_handler(int signum)
-{
-	sigint_flag = 1;
-}
-
-int termsploit_interactive(termsploit_ctx *ctx)
+void termsploit_interactive(termsploit_ctx *ctx)
 {
 	struct pollfd fds[2];
 	char buf[4096];
 	size_t l;
 
-	sigint_flag = 0;
-	if (SIG_ERR == signal(SIGINT, sigint_handler))
-		return -1;
 
 	fds[0].fd = STDIN_FILENO;
 	fds[0].events = POLLIN;
 	fds[1].fd = ctx->fd;
 	fds[1].events = POLLIN;
 
-	while (!sigint_flag && -1 != poll(fds, ARRAY_SIZE(fds), -1)) {
+	while (-1 != poll(fds, ARRAY_SIZE(fds), -1)) {
 		if (fds[0].revents & POLLHUP || fds[1].revents & POLLHUP)
 			break;
 
@@ -162,28 +150,22 @@ int termsploit_interactive(termsploit_ctx *ctx)
 				write(STDOUT_FILENO, buf, l);
 		}
 	}
-
-	if (SIG_ERR == signal(SIGINT, SIG_DFL))
-		return -1;
-
-	return 0;
 }
 
 /*** Spawn only API ***/
 
-int termsploit_kill(termsploit_ctx *ctx, int sig)
+int termsploit_kill(termsploit_ctx *ctx, int signum)
 {
 	if (-1 == ctx->pid) {
 		errno = EMEDIUMTYPE;
 		return -1;
 	}
-	return kill(ctx->pid, sig);
+
+	return kill(ctx->pid, signum);
 }
 
-/* FIXME: refactor busy loop into a timer */
-int termsploit_exitcode(termsploit_ctx *ctx, time_t timeout)
+int termsploit_wait(termsploit_ctx *ctx)
 {
-	time_t start, cur;
 	int exitcode;
 
 	if (-1 == ctx->pid) {
@@ -191,28 +173,7 @@ int termsploit_exitcode(termsploit_ctx *ctx, time_t timeout)
 		return -1;
 	}
 
-	start = time(0);
-	if (-1 == start)
+	if (-1 == waitpid(ctx->pid, &exitcode, 0))
 		return -1;
-	exitcode = -1;
-
-	for (;;) {
-		if (-1 == waitpid(ctx->pid, &exitcode, WNOHANG))
-			return -1;
-
-		if (-1 != exitcode) {
-			return exitcode;
-		} else {
-			cur = time(0);
-			if (-1 == cur)
-				return -1;
-			if (cur - start >= timeout)
-				break;
-		}
-	}
-
-	if (-1 == kill(ctx->pid, SIGKILL) ||
-			-1 == waitpid(ctx->pid, &exitcode, 0))
-		return -1;
-	return exitcode;
+	return WEXITSTATUS(exitcode);
 }

@@ -35,20 +35,20 @@ ssize_t termsploit_write(termsploit_ctx *ctx, char *buf, size_t len);
 
 /*
  * Connect an interactive shell to a context
- * NOTE: this function is *NOT* thread-safe
+ * NOTE: this function will take control of the user's terminal
  */
-int termsploit_interactive(termsploit_ctx *ctx);
+void termsploit_interactive(termsploit_ctx *ctx);
 
 /*** Spawn only API ***/
 
 /*
  * Send a signal to the process
  */
-int termsploit_kill(termsploit_ctx *ctx, int sig);
+int termsploit_kill(termsploit_ctx *ctx, int signum);
 
 /*
- * Wait for the process to exit and return the exit code
+ * Wait for the process to exit
  */
-int termsploit_exitcode(termsploit_ctx *ctx, time_t timeout);
+int termsploit_wait(termsploit_ctx *ctx);
 
 #endif
