@@ -2,5 +2,4 @@
 *.a
 *.so
 examples/vuln
-examples/exploit_spawn
-examples/exploit_connect
+examples/exploit

@@ -1,8 +1,13 @@
+CFLAGS  := -std=c99 -D_GNU_SOURCE -pedantic -Wall \
+	-Wdeclaration-after-statement -Wno-parentheses -I..
+LIBS    := -L.. -ltermsploit
+
 .PHONY: all
-all:
-	cc -DSPAWN exploit.c ../libtermsploit.a -o exploit_spawn
-	cc exploit.c ../libtermsploit.a -o exploit_connect
+all: exploit
+
+exploit:
+	$(CC) $(CFLAGS) exploit.c -o exploit $(LIBS)
 
 .PHONY: clean
 clean:
-	rm -f exploit_spawn exploit_connect
+	rm -f exploit

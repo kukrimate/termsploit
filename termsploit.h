@@ -6,22 +6,28 @@
  */
 typedef struct termsploit_ctx termsploit_ctx;
 
-/*
- * Create a new termsploit context and spawn a process in it
- */
-termsploit_ctx *termsploit_spawn(char *args[]);
-
-/*
- * Create a new termsploit context and attach it to a socket
- */
-termsploit_ctx *termsploit_connect(char *host, uint16_t port);
-
 /*** Core API ***/
+
+/*
+ * Allocate a termsploit context
+ */
+termsploit_ctx *termsploit_alloc();
 
 /*
  * Free a termsploit context
  */
 void termsploit_free(termsploit_ctx *ctx);
+
+/*
+ * Spawn a process attached to this context
+ */
+int termsploit_spawn(termsploit_ctx *ctx, char *args[]);
+
+/*
+ * Attach a socket to a context
+ */
+int termsploit_connect(termsploit_ctx *ctx, char *host, uint16_t port);
+
 
 /*
  * Read from a context's stdout/stderr

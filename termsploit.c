@@ -30,86 +30,79 @@ struct termsploit_ctx {
 	int fd;
 };
 
-termsploit_ctx *termsploit_spawn(char *args[])
+/*** Core API ***/
+
+termsploit_ctx *termsploit_alloc()
 {
 	termsploit_ctx *ctx;
 
+	ctx = malloc(sizeof(termsploit_ctx));
+	if (!ctx)
+		abort();
+
+	ctx->pid = -1;
+	ctx->fd  = -1;
+	return ctx;
+}
+
+void termsploit_free(termsploit_ctx *ctx)
+{
+	close(ctx->fd);
+	free(ctx);
+}
+
+int termsploit_spawn(termsploit_ctx *ctx, char *args[])
+{
 	int master, slave;
 	pid_t pid;
 
-	ctx = malloc(sizeof(termsploit_ctx));
-	if (!ctx)
-		goto err;
-
 	if (-1 == openrawpty(&master, &slave))
-		goto err_free;
+		return -1;
 
 	pid = fork();
-	switch (pid) {
-	case -1:
-		goto err_close;
+	if (-1 == pid) {
+		close(master);
+		close(slave);
+		return -1;
+	}
 
-	case 0:
+	if (!pid) {
 		/* Child process */
 		close(master);
 		if (-1 == dup2(slave, STDIN_FILENO) ||
 				-1 == dup2(slave, STDOUT_FILENO) ||
 				-1 == dup2(slave, STDERR_FILENO)) {
 			perror("dup2");
-			goto err_child;
+			exit(1);
 		}
 		close(slave);
 		if (-1 == setsid()) {
 			perror("setsid");
-			goto err_child;
+			exit(1);
 		}
 		if (-1 == ioctl(0, TIOCSCTTY, 1)) {
 			perror("ioctl");
-			goto err_child;
+			exit(1);
 		}
 		execv(args[0], args);
 		perror("exec");
-err_child:
 		exit(1);
 	}
 
 	ctx->pid = pid;
 	ctx->fd  = master;
 	close(slave);
-	return ctx;
-
-err_close:
-	close(master);
-	close(slave);
-err_free:
-	free(ctx);
-err:
-	return NULL;
+	return 0;
 }
 
-termsploit_ctx *termsploit_connect(char *host, uint16_t port)
+int termsploit_connect(termsploit_ctx *ctx, char *host, uint16_t port)
 {
-	termsploit_ctx *ctx;
-
-	ctx = malloc(sizeof(termsploit_ctx));
-	if (!ctx)
-		return NULL;
-
 	ctx->pid = -1;
 	ctx->fd  = tcpopen(host, port);
 	if (-1 == ctx->fd) {
-		free(ctx);
-		return NULL;
+		return -1;
 	}
-	return ctx;
-}
-
-/*** Core API ***/
-
-void termsploit_free(termsploit_ctx *ctx)
-{
-	close(ctx->fd);
-	free(ctx);
+	return 0;
 }
 
 ssize_t termsploit_read(termsploit_ctx *ctx, char *buf, size_t len)

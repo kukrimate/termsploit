@@ -6,7 +6,7 @@ CFLAGS  := -std=c99 -D_GNU_SOURCE -pedantic -Wall \
 LIBOBJ  := util.o termsploit.o
 
 .PHONY: all
-all: libtermsploit.so libtermsploit.a
+all: libtermsploit.a
 
 libtermsploit.so: $(LIBOBJ)
 	$(CC) $(LDFLAGS) -shared -o $@ $(LIBOBJ)
