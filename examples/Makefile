@@ -1,5 +1,6 @@
-CFLAGS  := -std=c99 -D_GNU_SOURCE -Wall -Wdeclaration-after-statement -I..
-LDLIBS  := -L.. -ltermsploit
+CFLAGS  := `pkg-config --cflags termsploit` \
+			-std=c99 -D_GNU_SOURCE -Wall -Wdeclaration-after-statement
+LDLIBS  := `pkg-config --libs termsploit`
 
 .PHONY: all
 all: exploit

@@ -1,12 +1,14 @@
-CFLAGS  := -fpic -I.. `pkg-config --cflags python3`
+CFLAGS  := `pkg-config --cflags termsploit` \
+			`pkg-config --cflags python3` -fpic
 LDFLAGS := -shared
-LIBS    := -L.. -ltermsploit `pkg-config --libs python3`
+LDLIBS  := `pkg-config --libs termsploit` \
+		   `pkg-config --libs python3`
 
 .PHONY: all
 all: pysploit.so
 
 pysploit.so: pysploit.o
-	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $^

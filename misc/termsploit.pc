@@ -1,0 +1,10 @@
+prefix=##PREFIX##
+exec_prefix=${prefix}
+includedir=${prefix}/include
+libdir=${exec_prefix}/lib
+
+Name: termsploit
+Description: Toolkit for writing exploits
+Version: 1.0.0
+Cflags: -I${includedir}/termsploit
+Libs: -L${libdir} -ltermsploit
