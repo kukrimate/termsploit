@@ -1,6 +1,5 @@
 # Compiler flags
-CFLAGS  := -std=c99 -D_GNU_SOURCE -pedantic -Wall \
-	-Wdeclaration-after-statement -Wno-parentheses
+CFLAGS  := -std=c99 -D_GNU_SOURCE -Wall -Wdeclaration-after-statement
 
 # Library object files
 LIBOBJ  := util.o termsploit.o

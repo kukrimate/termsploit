@@ -78,6 +78,19 @@ pysploit_read(pysploit_object *self, PyObject *arg)
 }
 
 static PyObject *
+pysploit_getline(pysploit_object *self, PyObject *Py_UNUSED(ignored))
+{
+	char *line;
+	PyObject *bytes;
+
+	line = termsploit_getline(self->ctx);
+	bytes = PyBytes_FromStringAndSize(line, strlen(line));
+	free(line);
+	return bytes;
+}
+
+
+static PyObject *
 pysploit_write(pysploit_object *self, PyObject *arg)
 {
 	if (-1 == termsploit_write(self->ctx,
@@ -122,6 +135,8 @@ static PyMethodDef pysploit_methods[] = {
 		(PyCFunction) pysploit_connect, METH_VARARGS },
 	{ "read",
 		(PyCFunction) pysploit_read, METH_O },
+	{ "getline",
+		(PyCFunction) pysploit_getline, METH_NOARGS },
 	{ "write",
 		(PyCFunction) pysploit_write, METH_O},
 	{ "interactive",

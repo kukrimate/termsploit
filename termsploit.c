@@ -110,6 +110,42 @@ ssize_t termsploit_read(termsploit_ctx *ctx, char *buf, size_t len)
 	return read(ctx->fd, buf, len);
 }
 
+char *termsploit_getline(termsploit_ctx *ctx)
+{
+	char *buf;
+	size_t len, idx;
+	ssize_t ret;
+
+	len = 10;
+	buf = malloc(sizeof *buf * len);
+	if (!buf)
+		abort();
+
+	idx = 0;
+	for (;;) {
+		// Read
+		ret = termsploit_read(ctx, buf + idx, sizeof *buf);
+		if (ret < 0) {
+			free(buf);
+			return NULL;
+		}
+
+		// Expand buffer if it's full
+		if (++idx >= len) {
+			len = 2 * idx;
+			buf = realloc(buf, sizeof *buf * len);
+			if (!buf)
+				abort();
+		}
+
+		// Return if we hit EOF or NL
+		if (!ret || buf[idx - 1] == '\n') {
+			buf[idx] = 0;
+			return buf;
+		}
+	}
+}
+
 ssize_t termsploit_write(termsploit_ctx *ctx, char *buf, size_t len)
 {
 	return write(ctx->fd, buf, len);

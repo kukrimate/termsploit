@@ -1,12 +1,11 @@
-CFLAGS  := -std=c99 -D_GNU_SOURCE -pedantic -Wall \
-	-Wdeclaration-after-statement -Wno-parentheses -I..
-LIBS    := -L.. -ltermsploit
+CFLAGS  := -std=c99 -D_GNU_SOURCE -Wall -Wdeclaration-after-statement -I..
+LDLIBS  := -L.. -ltermsploit
 
 .PHONY: all
 all: exploit
 
-exploit:
-	$(CC) $(CFLAGS) exploit.c -o exploit $(LIBS)
+exploit: exploit.c
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
 .PHONY: clean
 clean:

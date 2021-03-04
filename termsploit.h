@@ -35,6 +35,14 @@ int termsploit_connect(termsploit_ctx *ctx, char *host, uint16_t port);
 ssize_t termsploit_read(termsploit_ctx *ctx, char *buf, size_t len);
 
 /*
+ * Read till LF or EOF from a context's stdout/stderr
+ * NULL will be returned on error, on success a NUL-terminated, dynamically
+ * allocated buffer containing the string read will be returned, the caller
+ * must free this buffer
+ */
+char *termsploit_getline(termsploit_ctx *ctx);
+
+/*
  * Write to a context's stdin
  */
 ssize_t termsploit_write(termsploit_ctx *ctx, char *buf, size_t len);
