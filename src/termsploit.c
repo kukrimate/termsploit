@@ -57,11 +57,11 @@ int termsploit_spawn(termsploit_ctx *ctx, char *args[])
 	int master, slave;
 	pid_t pid;
 
-	if (-1 == openrawpty(&master, &slave))
+	if (openrawpty(&master, &slave) < 0)
 		return -1;
 
 	pid = fork();
-	if (-1 == pid) {
+	if (pid < 0) {
 		close(master);
 		close(slave);
 		return -1;
@@ -70,18 +70,18 @@ int termsploit_spawn(termsploit_ctx *ctx, char *args[])
 	if (!pid) {
 		/* Child process */
 		close(master);
-		if (-1 == dup2(slave, STDIN_FILENO) ||
-				-1 == dup2(slave, STDOUT_FILENO) ||
-				-1 == dup2(slave, STDERR_FILENO)) {
+		if (dup2(slave, STDIN_FILENO) < 0 ||
+				dup2(slave, STDOUT_FILENO) < 0 ||
+				dup2(slave, STDERR_FILENO) < 0) {
 			perror("dup2");
 			exit(1);
 		}
 		close(slave);
-		if (-1 == setsid()) {
+		if (setsid() < 0) {
 			perror("setsid");
 			exit(1);
 		}
-		if (-1 == ioctl(0, TIOCSCTTY, 1)) {
+		if (ioctl(0, TIOCSCTTY, 1) < 0) {
 			perror("ioctl");
 			exit(1);
 		}
@@ -100,7 +100,7 @@ int termsploit_connect(termsploit_ctx *ctx, char *host, uint16_t port)
 {
 	ctx->pid = -1;
 	ctx->fd  = tcpopen(host, port);
-	if (-1 == ctx->fd) {
+	if (ctx->fd < 0) {
 		return -1;
 	}
 	return 0;
@@ -113,36 +113,24 @@ ssize_t termsploit_read(termsploit_ctx *ctx, char *buf, size_t len)
 
 char *termsploit_getline(termsploit_ctx *ctx)
 {
-	char *buf;
-	size_t len, idx;
+	char ch;
+	CharVec vec;
 	ssize_t ret;
 
-	len = 10;
-	buf = malloc(sizeof *buf * len);
-	if (!buf)
-		abort();
-
-	idx = 0;
+	init_vector(&vec);
 	for (;;) {
-		// Read
-		ret = termsploit_read(ctx, buf + idx, sizeof *buf);
-		if (ret < 0) {
-			free(buf);
+		// Read character
+		if ((ret = termsploit_read(ctx, &ch, sizeof ch)) < 0) {
+			free(vec.array);
 			return NULL;
 		}
-
-		// Expand buffer if it's full
-		if (++idx >= len) {
-			len = 2 * idx;
-			buf = realloc(buf, sizeof *buf * len);
-			if (!buf)
-				abort();
-		}
-
-		// Return if we hit EOF or NL
-		if (!ret || buf[idx - 1] == '\n') {
-			buf[idx] = 0;
-			return buf;
+		// Add character if we got one
+		if (ret)
+			append_char(&vec, ch);
+		// End of file or NL
+		if (!ret || ch == '\n') {
+			append_char(&vec, 0);
+			return vec.array;
 		}
 	}
 }
@@ -186,7 +174,7 @@ void termsploit_interactive(termsploit_ctx *ctx)
 
 int termsploit_kill(termsploit_ctx *ctx, int signum)
 {
-	if (-1 == ctx->pid) {
+	if (ctx->pid < 0) {
 		errno = EMEDIUMTYPE;
 		return -1;
 	}
@@ -198,12 +186,12 @@ int termsploit_wait(termsploit_ctx *ctx)
 {
 	int exitcode;
 
-	if (-1 == ctx->pid) {
+	if (ctx->pid < 0) {
 		errno = EMEDIUMTYPE;
 		return -1;
 	}
 
-	if (-1 == waitpid(ctx->pid, &exitcode, 0))
+	if (waitpid(ctx->pid, &exitcode, 0) < 0)
 		return -1;
 	return WEXITSTATUS(exitcode);
 }
