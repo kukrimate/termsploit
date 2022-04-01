@@ -1,7 +1,7 @@
 # Install prefix
 PREFIX := /usr/local
 # Compiler flags
-CFLAGS := -std=c99 -D_GNU_SOURCE -Wall -Wdeclaration-after-statement
+CFLAGS := -Wall -std=c99 -D_GNU_SOURCE
 # Library object files
 LIBOBJ := src/util.o src/termsploit.o src/fmtstr.o
 

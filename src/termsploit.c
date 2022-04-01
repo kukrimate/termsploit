@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
@@ -54,46 +55,77 @@ void termsploit_free(termsploit_ctx *ctx)
 
 int termsploit_spawn(termsploit_ctx *ctx, char *args[])
 {
+	/* Create pty for communication */
 	int master, slave;
-	pid_t pid;
 
 	if (openrawpty(&master, &slave) < 0)
 		return -1;
 
-	pid = fork();
-	if (pid < 0) {
-		close(master);
-		close(slave);
-		return -1;
-	}
+	/* Create the error pipe */
+	int errfds[2];
 
-	if (!pid) {
-		/* Child process */
+	if (pipe2(errfds, O_CLOEXEC) < 0)
+		goto err_pty;
+
+	/* Create child process */
+	pid_t pid = fork();
+
+	if (pid < 0)
+		goto err_pipe;
+
+	if (pid == 0) {
+		/* Only the child enters this */
+
+		/* Close read side of the pipe */
+		close(errfds[0]);
+		/* Close master side of the pty */
 		close(master);
+
+		/* Make pty slave the child's console */
 		if (dup2(slave, STDIN_FILENO) < 0 ||
 				dup2(slave, STDOUT_FILENO) < 0 ||
-				dup2(slave, STDERR_FILENO) < 0) {
-			perror("dup2");
-			exit(1);
-		}
+				dup2(slave, STDERR_FILENO) < 0)
+			goto err_child;
 		close(slave);
-		if (setsid() < 0) {
-			perror("setsid");
-			exit(1);
-		}
-		if (ioctl(0, TIOCSCTTY, 1) < 0) {
-			perror("ioctl");
-			exit(1);
-		}
+
+		/* Make the pty the child's controlling terminal */
+		if (setsid() < 0 || ioctl(STDIN_FILENO, TIOCSCTTY, 1) < 0)
+			goto err_child;
+
+		/* Execute requested binary */
 		execv(args[0], args);
-		perror("exec");
+
+err_child:
+		/* Write error code to pipe */
+		write(errfds[1], &errno, sizeof errno);
+		/* Exit child */
 		exit(1);
 	}
 
+	/* Only the parent reaches this */
+
+	/* No need for the write side */
+	close(errfds[1]);
+	/* Read error from pipe */
+	if (read(errfds[0], &errno, sizeof errno) > 0)
+		goto err_pipe0;
+	/* No need for the read side anymore */
+	close(errfds[0]);
+	/* No need for the slave side of the pty */
+	close(slave);
+
 	ctx->pid = pid;
 	ctx->fd  = master;
-	close(slave);
 	return 0;
+
+err_pipe:
+	close(errfds[1]);
+err_pipe0:
+	close(errfds[0]);
+err_pty:
+	close(master);
+	close(slave);
+	return -1;
 }
 
 int termsploit_connect(termsploit_ctx *ctx, char *host, uint16_t port)
